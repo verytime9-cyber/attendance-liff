@@ -183,10 +183,11 @@
 
         showResult(true, actionLabel + " 完成！", "打卡資料已成功送出，請查看 LINE 訊息確認結果。");
 
-      } catch (err) {
-        document.getElementById("loader").style.display = "none";
-
-        if (err.code === 1) {
+        } catch (err) {
+          // 暫時除錯：把完整錯誤訊息顯示在畫面上
+          document.getElementById('subtitle').textContent = "錯誤詳情: " + JSON.stringify(err) + " | " + err.message;
+          document.getElementById('loading').style.display = 'none';
+          if (err.code === 1) {
           // 使用者拒絕定位
           showResult(false, "無法取得定位", "請至手機「設定 → LINE → 位置資訊」開啟定位權限後重試。");
         } else if (err.code === 2) {
