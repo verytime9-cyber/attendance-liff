@@ -138,7 +138,18 @@
         setDot(2, "done"); setDot(3, "active");
         setStatus("步驟 3/3：傳送打卡資料...");
 
-        // 步驟 3：傳送給後端（改用 XMLHttpRequest 避免 LINE 內建瀏覽器的 CORS 問題）
+        // 步驟 3：傳送給後端
+        var payloadData = {
+          liffData: {
+            action: action,
+            uid: uid,
+            lat: lat,
+            lng: lng,
+            accuracy: accuracy
+          }
+        };
+        var payloadString = JSON.stringify(payloadData);
+
         await new Promise(function(resolve, reject) {
           var xhr = new XMLHttpRequest();
           xhr.open("POST", POST_URL, true);
@@ -153,7 +164,7 @@
           xhr.onerror = function() {
             reject(new Error("網路連線失敗"));
           };
-          xhr.send(JSON.stringify(payload));
+          xhr.send(payloadString);
         });
 
         showResult(true, actionLabel + " 完成！", "打卡資料已成功送出，請查看 LINE 訊息確認結果。");
