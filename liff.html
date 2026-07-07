@@ -64,8 +64,8 @@
     // ⚠️【重要】請填入您的真實 LIFF ID
     const LIFF_ID = "2010371883-FlcDCDil";
 
-    // ⚠️【重要】請填入您的 GAS 網址
-    const POST_URL = "https://script.google.com/macros/s/AKfycbxR4tUK96GULaz4NbAp2DljB0ThXnv2ZP18My5Rfx1wgcTZUsURnedm6aAYXjvx0oT1/exec";
+    // ⚠️【重要】請填入您的  Cloudflare Worker 網址
+    const POST_URL = "https://line-attendance-proxy.verytime9.workers.dev";
 
     const ACTION_LABELS = {
       clockin: "上班簽到",
@@ -138,28 +138,23 @@
         setDot(2, "done"); setDot(3, "active");
         setStatus("步驟 3/3：傳送打卡資料...");
 
-        // 步驟 3：傳送給後端
-        var payload = {
-          liffData: {
-            action: action,
-            uid: uid,
-            lat: lat,
-            lng: lng,
-            accuracy: accuracy
-          }
-        };
-
-        var response = await fetch(POST_URL, {
-          method: "POST",
-          mode: "cors",
-          credentials: "omit",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+        // 步驟 3：傳送給後端（改用 XMLHttpRequest 避免 LINE 內建瀏覽器的 CORS 問題）
+        await new Promise(function(resolve, reject) {
+          var xhr = new XMLHttpRequest();
+          xhr.open("POST", POST_URL, true);
+          xhr.setRequestHeader("Content-Type", "application/json");
+          xhr.onload = function() {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(xhr.responseText);
+            } else {
+              reject(new Error("伺服器回應錯誤：" + xhr.status));
+            }
+          };
+          xhr.onerror = function() {
+            reject(new Error("網路連線失敗"));
+          };
+          xhr.send(JSON.stringify(payload));
         });
-
-        if (!response.ok) {
-          throw new Error("伺服器回應錯誤：" + response.status);
-        }
 
         showResult(true, actionLabel + " 完成！", "打卡資料已成功送出，請查看 LINE 訊息確認結果。");
 
