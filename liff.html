@@ -120,10 +120,11 @@
 
         setDot(1, "done"); setDot(2, "active");
 
-        // 步驟 2：取得 GPS
+        // 步驟 2：取得 GPS（自動重試取最佳精度）
         setStatus("步驟 2/3：取得您的 GPS 定位...");
 
-        var position = await new Promise(function(resolve, reject) {
+        // 第一次定位
+        var position1 = await new Promise(function(resolve, reject) {
           navigator.geolocation.getCurrentPosition(resolve, reject, {
             enableHighAccuracy: true,
             timeout: 15000,
@@ -131,9 +132,41 @@
           });
         });
 
-        var lat = position.coords.latitude;
-        var lng = position.coords.longitude;
-        var accuracy = Math.round(position.coords.accuracy);
+        var lat, lng, accuracy;
+
+        // 如果第一次精度超過 200 公尺，靜默重試一次取更好的結果
+        if (position1.coords.accuracy > 200) {
+          setStatus("步驟 2/3：精確定位中，請稍候...");
+          try {
+            var position2 = await new Promise(function(resolve, reject) {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 8000,
+                maximumAge: 0
+              });
+            });
+            // 取兩次裡精度較好的那一個
+            if (position2.coords.accuracy < position1.coords.accuracy) {
+              lat      = position2.coords.latitude;
+              lng      = position2.coords.longitude;
+              accuracy = Math.round(position2.coords.accuracy);
+            } else {
+              lat      = position1.coords.latitude;
+              lng      = position1.coords.longitude;
+              accuracy = Math.round(position1.coords.accuracy);
+            }
+          } catch (retryErr) {
+            // 重試失敗就用第一次的結果
+            lat      = position1.coords.latitude;
+            lng      = position1.coords.longitude;
+            accuracy = Math.round(position1.coords.accuracy);
+          }
+        } else {
+          // 第一次精度已經夠好，直接用
+          lat      = position1.coords.latitude;
+          lng      = position1.coords.longitude;
+          accuracy = Math.round(position1.coords.accuracy);
+        }
 
         setDot(2, "done"); setDot(3, "active");
         setStatus("步驟 3/3：傳送打卡資料...");
