@@ -61,7 +61,7 @@
   </div>
 
   <script>
-    // ⚠️【重要】請填入您的 LIFF ID
+    // ⚠️【重要】請填入您的真實 LIFF ID
     const LIFF_ID = "2010371883-FlcDCDil";
 
     // ⚠️【重要】請填入您的  Cloudflare Worker 網址
@@ -212,7 +212,7 @@
         } else if (err.code === 3) {
           showResult(false, "定位逾時", "GPS 訊號不穩，請移至戶外或靠近窗戶後重試。");
         } else {
-          showResult(false, "系統錯誤", err.message || "未知錯誤，請截圖此畫面並聯繫系統管理員。");
+          showResult(false, "系統錯誤", err.message || "未知錯誤，請截圖此畫面，並聯繫系統管理員。");
         }
       }
     }
