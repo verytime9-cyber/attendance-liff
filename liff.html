@@ -76,14 +76,8 @@
   </div>
 
   <script>
-    // ⚠️【重要】這個網頁是託管在 GitHub Pages 上的純靜態檔案，
-    // GAS 的 <?= ... ?> 樣板語法在這裡「不會」被執行，只會被當成
-    // 一般文字送到瀏覽器，所以這裡必須直接寫死真正的 LIFF ID，
-    // 不能用 <?= liffId ?> 這種寫法（那是給 GAS doGet() 動態產生
-    // 網頁時才有效的語法）。
-    // 請至 LINE Developers Console → 你的 LIFF App → 複製 LIFF ID
-    // 貼到下面雙引號中間。
-    const LIFF_ID = "2010371883-FlcDCDil";
+    // ⚠️【重要】這個 liffId 由 GAS doGet 注入，請勿手動修改這一行
+    const LIFF_ID = "<?= liffId ?>";
     document.getElementById('subtitle').textContent = "LIFF ID: " + LIFF_ID;
 
     // 各動作的顯示文字對照
@@ -167,7 +161,7 @@
 
         // Step 3: 傳送給 GAS（透過 Cloudflare Worker）
         // ⚠️【重要】將下方網址換成您的 Cloudflare Worker 網址
-        var POST_URL = "https://line-attendance-proxy.verytime9.workers.dev";
+        var POST_URL = "line-attendance-proxy.verytime9.workers.dev";
 
         var payload = {
           liffData: {
@@ -191,15 +185,20 @@
 
         var resultData = await response.json();
 
-        // ⚠️ 2026/8/18 起：打卡成功時，改由前端直接用 liff.sendMessages()
-        // 把確認訊息送進聊天室，不再依賴伺服器端 push（避免佔用月額度）。
-        // 訊息會顯示成「以您自己身份發送」，這是 liff.sendMessages() 的
-        // 固定行為，跟官方帳號主動推播的樣式不同，屬預期內。
-        // 就算這則訊息發送失敗，也不影響打卡本身已經成功寫入的事實，
-        // 所以整個包在 try/catch 裡，失敗只記錄不阻擋畫面顯示。
-        if (resultData && resultData.status === "ok" && resultData.result && resultData.result.success) {
+        // ⚠️ result.success 才是真正的成功/失敗依據，response.ok 只代表
+        // 「伺服器有正常回應」，不代表「打卡本身有成功」，這兩件事完全不同。
+        // 之前這裡沒有分開判斷，導致超出範圍打卡失敗時，畫面依然顯示「完成！」，
+        // 員工完全不知道其實沒有打卡成功。
+        var r = resultData && resultData.result;
+
+        if (r && r.success) {
+          // ⚠️ 2026/8/18 起：打卡成功時，改由前端直接用 liff.sendMessages()
+          // 把確認訊息送進聊天室，不再依賴伺服器端 push（避免佔用月額度）。
+          // 訊息會顯示成「以您自己身份發送」，這是 liff.sendMessages() 的
+          // 固定行為，跟官方帳號主動推播的樣式不同，屬預期內。
+          // 就算這則訊息發送失敗，也不影響打卡本身已經成功寫入的事實，
+          // 所以整個包在 try/catch 裡，失敗只記錄不阻擋畫面顯示。
           try {
-            var r = resultData.result;
             await liff.sendMessages([{
               type: "text",
               text:
@@ -214,9 +213,22 @@
           } catch (sendErr) {
             console.log("liff.sendMessages 失敗（不影響打卡結果）：", sendErr);
           }
-        }
 
-        showResult(true, actionLabel + " 完成！", "打卡資料已成功送出，請查看 LINE 訊息確認結果。");
+          showResult(true, actionLabel + " 完成！", "打卡資料已成功送出，請查看 LINE 訊息確認結果。");
+
+        } else if (r && r.success === false) {
+          // 明確的業務邏輯失敗（例如超出打卡範圍），不是網路或系統錯誤，
+          // 直接把後端算出來的距離資訊顯示給員工看，不用等 LINE 通知
+          // （額度不夠時 LINE 通知本來就可能收不到，畫面上這裡才是最終保障）。
+          showResult(false, actionLabel + " 失敗",
+            "您目前位置距離「" + r.locationName + "」約 " + r.distance + " 公尺，" +
+            "超出允許範圍（" + r.allowedRadius + " 公尺）。\n\n若您正在外勤，請改點「外勤打卡」。"
+          );
+
+        } else {
+          // 沒有明確 result（例如查無綁定資料等其他例外狀況），顯示通用失敗訊息
+          showResult(false, actionLabel + " 失敗", "系統未能確認打卡結果，請查看 LINE 訊息或聯繫主管確認。");
+        }
 
       } catch (err) {
         document.getElementById("loader").style.display = "none";
