@@ -76,8 +76,15 @@
   </div>
 
   <script>
-    // ⚠️【重要】這個 liffId 由 GAS doGet 注入，請勿手動修改這一行
-    const LIFF_ID = "<?= liffId ?>";
+    // ⚠️【重要】這個網頁是託管在 GitHub Pages 上的純靜態檔案，
+    // GAS 的 <?= ... ?> 樣板語法在這裡「不會」被執行，只會被當成
+    // 一般文字送到瀏覽器，所以這裡必須直接寫死真正的 LIFF ID，
+    // 不能用 <?= liffId ?> 這種寫法（那是給 GAS doGet() 動態產生
+    // 網頁時才有效的語法）。
+    // 請至 LINE Developers Console → 你的 LIFF App → 複製 LIFF ID
+    // 貼到下面雙引號中間，你原本使用中的真實 ID 大概長這樣：
+    // 1234567890-AbCdEfGh
+    const LIFF_ID = "2010371883-FlcDCDil";
     document.getElementById('subtitle').textContent = "LIFF ID: " + LIFF_ID;
 
     // 各動作的顯示文字對照
