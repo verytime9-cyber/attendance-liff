@@ -3,6 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- ⚠️ 防快取設定：告訴所有瀏覽器（含 LINE 內建瀏覽器）這個頁面
+       每次都要重新下載，不能沿用舊的快取版本。
+       這樣以後每次更新這份檔案，不用再手動加版本號、
+       也不用請任何人清 LINE 快取，全部自動生效。 -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>考勤打卡系統</title>
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
