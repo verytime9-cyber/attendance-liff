@@ -209,6 +209,22 @@
         // 員工完全不知道其實沒有打卡成功。
         var r = resultData && resultData.result;
 
+        // ⚠️ 待補送通知：之前因為 LINE 額度用完而卡住、沒能即時送達的
+        // 請假/補簽/加班審核通知，會在這裡一次補送進聊天室（免額度）。
+        // 跟這次打卡本身成功或失敗無關，只要有積壓的通知就會補送。
+        var pending = resultData && resultData.pendingNotifications;
+        if (pending && pending.length > 0) {
+          try {
+            // liff.sendMessages() 一次最多 5 則，這裡做個保護上限
+            var toSend = pending.slice(0, 5).map(function(text) {
+              return { type: "text", text: "【補送通知】\n" + text };
+            });
+            await liff.sendMessages(toSend);
+          } catch (pendingErr) {
+            console.log("補送待處理通知失敗：", pendingErr);
+          }
+        }
+
         if (r && r.success) {
           // ⚠️ 2026/8/18 起：打卡成功時，改由前端直接用 liff.sendMessages()
           // 把確認訊息送進聊天室，不再依賴伺服器端 push（避免佔用月額度）。
