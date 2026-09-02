@@ -66,6 +66,16 @@
     }
     .dot.active { background: #667eea; }
     .dot.done { background: #28a745; }
+    .warning {
+      margin-top: 20px;
+      padding: 10px 12px;
+      background: #fff8e1;
+      border: 1px solid #ffe082;
+      border-radius: 10px;
+      font-size: 13px;
+      color: #8a6d00;
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
@@ -80,6 +90,11 @@
       <div class="dot" id="dot2"></div>
       <div class="dot" id="dot3"></div>
     </div>
+    <!-- 🆕 從一開始就持續提醒，不要等到最後才講——因為問題往往發生在
+         「資料其實已經送出成功，但畫面還沒跑完最後幾步」的這段空檔，
+         等到快結束才提醒已經太晚，員工可能早就把頁面關掉了。
+         打卡完成（showResult 執行）後會被隱藏。 -->
+    <div class="warning" id="warning">⚠️ 處理中，請勿關閉此頁面或返回聊天室</div>
   </div>
 
   <script>
@@ -118,6 +133,7 @@
     // 顯示最終結果
     function showResult(success, title, msg) {
       document.getElementById("loader").style.display = "none";
+      document.getElementById("warning").style.display = "none"; // 流程已結束，不用再提醒了
       document.getElementById("icon").textContent = success ? "✅" : "❌";
       document.getElementById("title").textContent = title;
       document.getElementById("subtitle").textContent = msg;
@@ -209,25 +225,17 @@
         // 員工完全不知道其實沒有打卡成功。
         var r = resultData && resultData.result;
 
-        // ⚠️ 待補送通知：之前因為 LINE 額度用完而卡住、沒能即時送達的
-        // 請假/補簽/加班審核通知，會在這裡一次補送進聊天室（免額度）。
-        // 跟這次打卡本身成功或失敗無關，只要有積壓的通知就會補送。
-        var pending = resultData && resultData.pendingNotifications;
-        if (pending && pending.length > 0) {
-          try {
-            // liff.sendMessages() 一次最多 5 則，這裡做個保護上限
-            var toSend = pending.slice(0, 5).map(function(text) {
-              return { type: "text", text: "【補送通知】\n" + text };
-            });
-            await liff.sendMessages(toSend);
-          } catch (pendingErr) {
-            console.log("補送待處理通知失敗：", pendingErr);
-          }
-        }
-
         if (r && r.success) {
-          // ⚠️ 2026/8/18 起：打卡成功時，改由前端直接用 liff.sendMessages()
-          // 把確認訊息送進聊天室，不再依賴伺服器端 push（避免佔用月額度）。
+          // 🛠️ 2026/9/2 起：把「這次打卡的成功確認」提到最前面優先送出，
+          // 不再跟待補送通知搶順序。原因：先前是待補送通知先送、
+          // 打卡確認後送，如果員工在這段等待期間提早關閉頁面或滑回
+          // 聊天室，最重要的「這次打卡成功」訊息反而是最後才送、
+          // 最容易被中斷、完全沒送出——但後端其實已經正常寫入成功了，
+          // 員工卻完全不知道。現在改成最重要的訊息最先送，
+          // 就算後面待補送通知那步真的被中斷，頂多是那批通知這次
+          // 沒送到（它們還留在 Pending_Notifications，下次還有機會
+          // 補送，或下次查詢出勤紀錄時也會夾帶），不會犧牲掉這次
+          // 打卡本身的確認。
           // 訊息會顯示成「以您自己身份發送」，這是 liff.sendMessages() 的
           // 固定行為，跟官方帳號主動推播的樣式不同，屬預期內。
           // 就算這則訊息發送失敗，也不影響打卡本身已經成功寫入的事實，
@@ -248,7 +256,26 @@
             console.log("liff.sendMessages 失敗（不影響打卡結果）：", sendErr);
           }
 
-          showResult(true, actionLabel + " 完成！", "打卡資料已成功送出，請查看 LINE 訊息確認結果。");
+          // ⚠️ 待補送通知：之前因為 LINE 額度用完而卡住、沒能即時送達的
+          // 請假/補簽/加班審核通知，這裡順便補送進聊天室（免額度）。
+          // 跟這次打卡本身成功或失敗無關，只要有積壓的通知就會補送。
+          // 刻意放在打卡成功確認「之後」，理由見上方說明。
+          var pending = resultData && resultData.pendingNotifications;
+          if (pending && pending.length > 0) {
+            try {
+              // liff.sendMessages() 一次最多 5 則，這裡做個保護上限
+              var toSend = pending.slice(0, 5).map(function(text) {
+                return { type: "text", text: "【補送通知】\n" + text };
+              });
+              await liff.sendMessages(toSend);
+            } catch (pendingErr) {
+              console.log("補送待處理通知失敗：", pendingErr);
+            }
+          }
+
+          showResult(true, actionLabel + " 完成！",
+            "打卡資料已成功送出。\n\n請確認 LINE 聊天室是否收到本次打卡通知，若沒有看到通知，請聯繫主管確認紀錄。"
+          );
 
         } else if (r && r.success === false) {
           // 明確的業務邏輯失敗（例如超出打卡範圍），不是網路或系統錯誤，
