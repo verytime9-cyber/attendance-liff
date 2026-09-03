@@ -261,13 +261,39 @@
           // 跟這次打卡本身成功或失敗無關，只要有積壓的通知就會補送。
           // 刻意放在打卡成功確認「之後」，理由見上方說明。
           var pending = resultData && resultData.pendingNotifications;
+          var pendingRows = resultData && resultData.pendingRows;
           if (pending && pending.length > 0) {
             try {
               // liff.sendMessages() 一次最多 5 則，這裡做個保護上限
-              var toSend = pending.slice(0, 5).map(function(text) {
+              // （pendingRows 用同樣的切法，確保列號跟訊息內容對得上）
+              var sendCount = Math.min(pending.length, 5);
+              var toSend = pending.slice(0, sendCount).map(function(text) {
                 return { type: "text", text: "【補送通知】\n" + text };
               });
               await liff.sendMessages(toSend);
+
+              // 🛠️ 2026/9/2 起：liff.sendMessages() 沒有拋出例外，代表這批
+              // 待補送通知已經真的送出成功，這時候才回報伺服器把對應的
+              // 列號標記已送達（見 GAS 的 confirmPendingDelivered 分流）。
+              // 這一步失敗完全不影響員工體驗（畫面已經顯示成功了），
+              // 頂多下次還會再看到一次這批通知，所以同樣包在 try/catch
+              // 裡，失敗只記錄不處理。
+              if (pendingRows && pendingRows.length > 0) {
+                try {
+                  await fetch(POST_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      confirmPendingDelivered: {
+                        uid: uid,
+                        rows: pendingRows.slice(0, sendCount)
+                      }
+                    })
+                  });
+                } catch (confirmErr) {
+                  console.log("回報待補送通知已送達失敗（下次還會再收到一次，不影響本次打卡）：", confirmErr);
+                }
+              }
             } catch (pendingErr) {
               console.log("補送待處理通知失敗：", pendingErr);
             }
